@@ -259,9 +259,7 @@ constexpr auto test_relu_detail()
     mat2(1, 0) = 0.5;
     mat2(1, 1) = -0;
 
-    ReLU<2, 2> relu;
-
-    return std::make_tuple(relu.forward(mat), mat2);
+    return std::make_tuple(ReLU::forward(mat), mat2);
 }
 
 constexpr void test_relu()

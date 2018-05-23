@@ -132,9 +132,10 @@ struct Linear {
     }
 };
 
-template <size_t BatchSize, size_t InSize>
 struct ReLU {
-    constexpr Matrix<BatchSize, InSize> forward(Matrix<BatchSize, InSize> src)
+    template <size_t BatchSize, size_t InSize>
+    static constexpr Matrix<BatchSize, InSize> forward(
+        Matrix<BatchSize, InSize> src)
     {
         for (size_t i = 0; i < BatchSize; i++)
             for (size_t j = 0; j < InSize; j++)
@@ -142,7 +143,9 @@ struct ReLU {
         return src;
     }
 
-    constexpr Matrix<BatchSize, InSize> backward(Matrix<BatchSize, InSize> src)
+    template <size_t BatchSize, size_t InSize>
+    static constexpr Matrix<BatchSize, InSize> backward(
+        Matrix<BatchSize, InSize> src)
     {
         for (size_t i = 0; i < BatchSize; i++)
             for (size_t j = 0; j < InSize; j++)
@@ -202,5 +205,38 @@ struct SoftmaxCrossEntropy {
 /////////////////////
 //// main
 /////////////////////
+
+template <size_t BatchSize, size_t InSize, size_t NUnit, size_t NOut>
+struct MLP3 {
+    Linear<BatchSize, InSize, NUnit> l1;
+    Linear<BatchSize, NUnit, NUnit> l2;
+    Linear<BatchSize, NUnit, NOut> l3;
+    SoftmaxCrossEntropy<BatchSize, NOut> sce;
+
+    constexpr float forward(const Matrix<BatchSize, 764>& src)
+    {
+        constexpr auto h1 = ReLU::forward(l1.forward(src));
+        constexpr auto h2 = ReLU::forward(l2.forward(l1));
+        constexpr auto h3 = ReLU::forward(l3.forward(l2));
+        constexpr float loss = sce.forward(h3);
+        return loss;
+    }
+
+    constexpr void backward(float in = 1)
+    {
+        constexpr auto h1 = sce.backward(in);
+        constexpr auto h2 = l3.backward(ReLU::backward(h1));
+        constexpr auto h3 = l2.backward(ReLU::backward(h2));
+        constexpr auto h4 = l1.backward(ReLU::backward(h3));
+    }
+
+    template <class SGD>
+    constexpr void update(SGD sgd)
+    {
+        l1.update(sgd);
+        l2.update(sgd);
+        l3.update(sgd);
+    }
+};
 
 int main() {}
