@@ -26,7 +26,7 @@ struct Matrix {
     }
 };
 
-constexpr std::tuple<Matrix<2, 2>, Matrix<2, 2>> test()
+constexpr std::tuple<Matrix<2, 2>, Matrix<2, 2>> test_matrix_transposed_detail()
 {
     Matrix<2, 2> mat;
     mat(0, 0) = 0;
@@ -36,8 +36,13 @@ constexpr std::tuple<Matrix<2, 2>, Matrix<2, 2>> test()
     return std::make_tuple(mat, mat.transposed());
 }
 
-int main()
+constexpr void test_matrix_transposed()
 {
-    constexpr auto ret = test();
+    constexpr auto ret = test_matrix_transposed_detail();
+    static_assert(std::get<0>(ret)(0, 0) == std::get<1>(ret)(0, 0));
     static_assert(std::get<0>(ret)(0, 1) == std::get<1>(ret)(1, 0));
+    static_assert(std::get<0>(ret)(1, 0) == std::get<1>(ret)(0, 1));
+    static_assert(std::get<0>(ret)(1, 1) == std::get<1>(ret)(1, 1));
 }
+
+int main() {}
