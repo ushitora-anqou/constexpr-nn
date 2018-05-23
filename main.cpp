@@ -1,3 +1,4 @@
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <tuple>
@@ -213,13 +214,15 @@ struct MLP3 {
     Linear<BatchSize, NUnit, NOut> l3;
     SoftmaxCrossEntropy<BatchSize, NOut> sce;
 
-    constexpr float forward(const Matrix<BatchSize, 764>& src)
+    static constexpr size_t get_batch_size() { return BatchSize; }
+
+    constexpr auto forward(const Matrix<BatchSize, 764>& src)
     {
         constexpr auto h1 = ReLU::forward(l1.forward(src));
         constexpr auto h2 = ReLU::forward(l2.forward(l1));
         constexpr auto h3 = ReLU::forward(l3.forward(l2));
         constexpr float loss = sce.forward(h3);
-        return loss;
+        return std::make_tuple(h3, loss);
     }
 
     constexpr void backward(float in = 1)
@@ -238,5 +241,26 @@ struct MLP3 {
         l3.update(sgd);
     }
 };
+
+template <class NN, size_t N, size_t InSize>
+constexpr auto predict(NN nn, const Matrix<N, InSize>& src)
+{
+    static_assert(N <= NN::get_batch_size());
+    Matrix<NN::get_batch_size, InSize> in;
+    for (size_t i = 0; i < N; i++)
+        for (size_t j = 0; j < InSize; j++) in(i, j) = src(i, j);
+    constexpr auto res = nn.forward(in);
+
+    auto ret = std::array<size_t, N>();
+    for (size_t i = 0; i < N; i++) {
+        size_t argmax = 0;
+        for (size_t j = 0; j < res.shape()[1]; j++)
+            if (std::get<0>(res)(i, argmax) < std::get<0>(res)(i, j))
+                argmax = j;
+        ret[i] = argmax;
+    }
+
+    return ret;
+}
 
 int main() {}
