@@ -216,7 +216,7 @@ struct MLP3 {
 
     static constexpr size_t get_batch_size() { return BatchSize; }
 
-    constexpr auto forward(const Matrix<BatchSize, 764>& src)
+    constexpr auto forward(const Matrix<BatchSize, InSize>& src)
     {
         constexpr auto h1 = ReLU::forward(l1.forward(src));
         constexpr auto h2 = ReLU::forward(l2.forward(l1));
@@ -262,5 +262,18 @@ constexpr auto predict(NN nn, const Matrix<N, InSize>& src)
 
     return ret;
 }
+
+struct SGD {
+    float lr;
+
+    constexpr SGD(float alr) : lr(alr) {}
+
+    template <size_t BatchSize, size_t Size>
+    Matrix<BatchSize, Size> operator()(const Matrix<BatchSize, Size>& W,
+                                       const Matrix<BatchSize, Size>& dW)
+    {
+        return W + dW * -lr;
+    }
+};
 
 int main() {}
