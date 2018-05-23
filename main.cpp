@@ -98,36 +98,63 @@ constexpr bool operator!=(const Matrix<lN, lM>& lhs, const Matrix<rN, rM>& rhs)
 /////////////////////
 //// NN component
 /////////////////////
-template <size_t InSize, size_t OutSize>
+template <size_t BatchSize, size_t InSize, size_t OutSize>
 struct Linear {
-    Matrix<InSize, OutSize> W;
-    Vector<OutSize> b;
+    Matrix<InSize, OutSize> W, dW;
+    Vector<OutSize> b, db;
+    Matrix<BatchSize, InSize> x;
 
-    constexpr Linear() : W{}, b{} {}
+    constexpr Linear() {}
 
-    template <size_t BatchSize>
     constexpr Matrix<BatchSize, OutSize> forward(
         const Matrix<BatchSize, InSize>& src)
     {
+        x = src;
         return src.dot(W) + b;
+    }
+
+    constexpr Matrix<BatchSize, InSize> backward(
+        const Matrix<BatchSize, OutSize>& src)
+    {
+        auto dx = src.dot(W.transposed());
+        dW = x.transposed().dot(src);
+        db = Vector<OutSize>();
+        for (size_t i = 0; i < BatchSize; i++)
+            for (size_t j = 0; j < OutSize; j++) db[j] += src(i, j);
+        return dx;
+    }
+
+    template <class SGD>
+    void update(SGD sgd)
+    {
+        W = sgd(W, dW);
+        b = sgd(b, db);
     }
 };
 
-template <size_t Size>
+template <size_t BatchSize, size_t InSize>
 struct ReLU {
-    template <size_t BatchSize>
-    constexpr Matrix<BatchSize, Size> forward(Matrix<BatchSize, Size> src)
+    constexpr Matrix<BatchSize, InSize> forward(Matrix<BatchSize, InSize> src)
     {
         for (size_t i = 0; i < BatchSize; i++)
-            for (size_t j = 0; j < Size; j++)
+            for (size_t j = 0; j < InSize; j++)
+                if (src(i, j) < 0) src(i, j) = 0;
+        return src;
+    }
+
+    constexpr Matrix<BatchSize, InSize> backward(Matrix<BatchSize, InSize> src)
+    {
+        for (size_t i = 0; i < BatchSize; i++)
+            for (size_t j = 0; j < InSize; j++)
                 if (src(i, j) < 0) src(i, j) = 0;
         return src;
     }
 };
 
-template <size_t InSize>
+template <size_t BatchSize, size_t InSize>
 struct SoftmaxCrossEntropy {
-    template <size_t BatchSize>
+    Matrix<BatchSize, InSize> y, t;
+
     constexpr float forward(Matrix<BatchSize, InSize> src,
                             const Matrix<BatchSize, InSize>& t)
     {
@@ -148,6 +175,8 @@ struct SoftmaxCrossEntropy {
             // src[i] /= s
             for (size_t j = 0; j < InSize; j++) src(i, j) /= s;
         }
+        this->y = src;
+        this->t = t;
 
         // process cross-entropy
         float loss_sum = 0;
@@ -156,6 +185,15 @@ struct SoftmaxCrossEntropy {
                 loss_sum += t(i, j) * std::log(src(i, j));
 
         return -loss_sum / BatchSize;
+    }
+
+    constexpr Matrix<BatchSize, InSize> backward()
+    {
+        Matrix<BatchSize, InSize> dx;
+        for (size_t i = 0; i < BatchSize; i++)
+            for (size_t j = 0; j < InSize; j++)
+                dx(i, j) = (y(i, j) - t(i, j)) / BatchSize;
+        return dx;
     }
 };
 

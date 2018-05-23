@@ -226,7 +226,7 @@ constexpr auto test_linear1_detail()
     b[1] = 2;
     b[2] = 2;
 
-    Linear<2, 3> l;
+    Linear<2, 2, 3> l;
     l.W = W;
     l.b = b;
 
@@ -259,7 +259,7 @@ constexpr auto test_relu_detail()
     mat2(1, 0) = 0.5;
     mat2(1, 1) = -0;
 
-    ReLU<2> relu;
+    ReLU<2, 2> relu;
 
     return std::make_tuple(relu.forward(mat), mat2);
 }
@@ -289,7 +289,7 @@ constexpr auto test_softmax_cross_entropy_detail()
     mat2(1, 0) = 1;
     mat2(1, 1) = 0;
 
-    SoftmaxCrossEntropy<2> sce;
+    SoftmaxCrossEntropy<2, 2> sce;
     return std::make_tuple(sce.forward(mat, mat2), 0.8132616281509399);
 }
 
