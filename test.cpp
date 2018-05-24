@@ -2,13 +2,13 @@
 /// tests
 //////////////////
 
-constexpr void test_matrix_shape()
+HOOLIB_CONSTEXPR void test_matrix_shape()
 {
     Matrix<2, 3> mat;
-    static_assert(mat.shape() == std::tuple<size_t, size_t>(2, 3));
+    HOOLIB_STATIC_ASSERT(mat.shape() == std::tuple<size_t, size_t>(2, 3));
 }
 
-constexpr auto test_matrix_equal1_detail()
+HOOLIB_CONSTEXPR auto test_matrix_equal1_detail()
 {
     Matrix<2, 3> mat;
     mat(0, 0) = 0;
@@ -20,7 +20,7 @@ constexpr auto test_matrix_equal1_detail()
     return std::make_tuple(mat, mat);
 }
 
-constexpr auto test_matrix_equal2_detail()
+HOOLIB_CONSTEXPR auto test_matrix_equal2_detail()
 {
     Matrix<2, 3> mat;
     mat(0, 0) = 0;
@@ -39,32 +39,32 @@ constexpr auto test_matrix_equal2_detail()
     return std::make_tuple(mat, mat1);
 }
 
-constexpr auto test_matrix_equal3_detail()
+HOOLIB_CONSTEXPR auto test_matrix_equal3_detail()
 {
     Matrix<2, 2> mat;
     Matrix<2, 4> mat1;
     return std::make_tuple(mat, mat1);
 }
 
-constexpr void test_matrix_equal1()
+HOOLIB_CONSTEXPR void test_matrix_equal1()
 {
-    constexpr auto ret = test_matrix_equal1_detail();
-    static_assert(std::get<0>(ret) == std::get<1>(ret));
+    HOOLIB_CONSTEXPR auto ret = test_matrix_equal1_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret) == std::get<1>(ret));
 }
 
-constexpr void test_matrix_equal2()
+HOOLIB_CONSTEXPR void test_matrix_equal2()
 {
-    constexpr auto ret = test_matrix_equal2_detail();
-    static_assert(std::get<0>(ret) != std::get<1>(ret));
+    HOOLIB_CONSTEXPR auto ret = test_matrix_equal2_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret) != std::get<1>(ret));
 }
 
-constexpr void test_matrix_equal3()
+HOOLIB_CONSTEXPR void test_matrix_equal3()
 {
-    constexpr auto ret = test_matrix_equal3_detail();
-    static_assert(std::get<0>(ret) != std::get<1>(ret));
+    HOOLIB_CONSTEXPR auto ret = test_matrix_equal3_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret) != std::get<1>(ret));
 }
 
-constexpr auto test_matrix_transposed_detail()
+HOOLIB_CONSTEXPR auto test_matrix_transposed_detail()
 {
     Matrix<2, 2> mat;
     mat(0, 0) = 0;
@@ -74,16 +74,16 @@ constexpr auto test_matrix_transposed_detail()
     return std::make_tuple(mat, mat.transposed());
 }
 
-constexpr void test_matrix_transposed()
+HOOLIB_CONSTEXPR void test_matrix_transposed()
 {
-    constexpr auto ret = test_matrix_transposed_detail();
-    static_assert(std::get<0>(ret)(0, 0) == std::get<1>(ret)(0, 0));
-    static_assert(std::get<0>(ret)(0, 1) == std::get<1>(ret)(1, 0));
-    static_assert(std::get<0>(ret)(1, 0) == std::get<1>(ret)(0, 1));
-    static_assert(std::get<0>(ret)(1, 1) == std::get<1>(ret)(1, 1));
+    HOOLIB_CONSTEXPR auto ret = test_matrix_transposed_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret)(0, 0) == std::get<1>(ret)(0, 0));
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret)(0, 1) == std::get<1>(ret)(1, 0));
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret)(1, 0) == std::get<1>(ret)(0, 1));
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret)(1, 1) == std::get<1>(ret)(1, 1));
 }
 
-constexpr auto test_matrix_add_detail()
+HOOLIB_CONSTEXPR auto test_matrix_add_detail()
 {
     Matrix<2, 2> mat, mat2, mat3;
     mat(0, 0) = 0;
@@ -102,20 +102,20 @@ constexpr auto test_matrix_add_detail()
     return std::make_tuple(mat + mat2, mat3);
 }
 
-constexpr void test_matrix_add()
+HOOLIB_CONSTEXPR void test_matrix_add()
 {
-    constexpr auto ret = test_matrix_add_detail();
-    static_assert(std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) <
-                  1e-5);
+    HOOLIB_CONSTEXPR auto ret = test_matrix_add_detail();
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) < 1e-5);
 }
 
-constexpr auto test_matrix_mul_detail()
+HOOLIB_CONSTEXPR auto test_matrix_mul_detail()
 {
     Matrix<2, 2> mat, mat2;
     mat(0, 0) = 0;
@@ -130,20 +130,20 @@ constexpr auto test_matrix_mul_detail()
     return std::make_tuple(mat * 2, mat2);
 }
 
-constexpr void test_matrix_mul()
+HOOLIB_CONSTEXPR void test_matrix_mul()
 {
-    constexpr auto ret = test_matrix_mul_detail();
-    static_assert(std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) <
-                  1e-5);
+    HOOLIB_CONSTEXPR auto ret = test_matrix_mul_detail();
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) < 1e-5);
 }
 
-constexpr auto test_matrix_dot_detail()
+HOOLIB_CONSTEXPR auto test_matrix_dot_detail()
 {
     Matrix<2, 3> mat;
     Matrix<3, 2> mat2;
@@ -168,20 +168,20 @@ constexpr auto test_matrix_dot_detail()
     return std::make_tuple(mat.dot(mat2), ans);
 }
 
-constexpr void test_matrix_dot()
+HOOLIB_CONSTEXPR void test_matrix_dot()
 {
-    constexpr auto ret = test_matrix_dot_detail();
-    static_assert(std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) <
-                  1e-5);
+    HOOLIB_CONSTEXPR auto ret = test_matrix_dot_detail();
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) < 1e-5);
 }
 
-constexpr auto test_vector1_detail()
+HOOLIB_CONSTEXPR auto test_vector1_detail()
 {
     Vector<2> vec;
     vec[0] = 0;
@@ -189,13 +189,13 @@ constexpr auto test_vector1_detail()
     return std::make_tuple(vec, vec);
 }
 
-constexpr void test_vector1()
+HOOLIB_CONSTEXPR void test_vector1()
 {
-    constexpr auto ret = test_vector1_detail();
-    static_assert(std::get<0>(ret) == std::get<1>(ret));
+    HOOLIB_CONSTEXPR auto ret = test_vector1_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret) == std::get<1>(ret));
 }
 
-constexpr auto test_vector2_detail()
+HOOLIB_CONSTEXPR auto test_vector2_detail()
 {
     Vector<2> vec;
     vec[0] = 0;
@@ -206,13 +206,13 @@ constexpr auto test_vector2_detail()
     return std::make_tuple(vec, vec2);
 }
 
-constexpr void test_vector2()
+HOOLIB_CONSTEXPR void test_vector2()
 {
-    constexpr auto ret = test_vector2_detail();
-    static_assert(std::get<0>(ret) != std::get<1>(ret));
+    HOOLIB_CONSTEXPR auto ret = test_vector2_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret) != std::get<1>(ret));
 }
 
-constexpr auto test_linear1_detail()
+HOOLIB_CONSTEXPR auto test_linear1_detail()
 {
     Matrix<2, 3> W;
     W(0, 0) = 0;
@@ -241,13 +241,13 @@ constexpr auto test_linear1_detail()
     return std::make_tuple(ret, ans);
 }
 
-constexpr void test_linear1()
+HOOLIB_CONSTEXPR void test_linear1()
 {
-    constexpr auto ret = test_linear1_detail();
-    static_assert(std::get<0>(ret) == std::get<1>(ret));
+    HOOLIB_CONSTEXPR auto ret = test_linear1_detail();
+    HOOLIB_STATIC_ASSERT(std::get<0>(ret) == std::get<1>(ret));
 }
 
-constexpr auto test_relu_detail()
+HOOLIB_CONSTEXPR auto test_relu_detail()
 {
     Matrix<2, 2> mat, mat2;
     mat(0, 0) = -1;
@@ -262,20 +262,20 @@ constexpr auto test_relu_detail()
     return std::make_tuple(ReLU::forward(mat), mat2);
 }
 
-constexpr void test_relu()
+HOOLIB_CONSTEXPR void test_relu()
 {
-    constexpr auto ret = test_relu_detail();
-    static_assert(std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) <
-                  1e-5);
-    static_assert(std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) <
-                  1e-5);
+    HOOLIB_CONSTEXPR auto ret = test_relu_detail();
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 0) - std::get<1>(ret)(0, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(0, 1) - std::get<1>(ret)(0, 1)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 0) - std::get<1>(ret)(1, 0)) < 1e-5);
+    HOOLIB_STATIC_ASSERT(
+        std::abs(std::get<0>(ret)(1, 1) - std::get<1>(ret)(1, 1)) < 1e-5);
 }
 
-constexpr auto test_softmax_cross_entropy_detail()
+HOOLIB_CONSTEXPR auto test_softmax_cross_entropy_detail()
 {
     Matrix<2, 2> mat, mat2;
     mat(0, 0) = -1;
@@ -291,8 +291,8 @@ constexpr auto test_softmax_cross_entropy_detail()
     return std::make_tuple(sce.forward(mat, mat2), 0.8132616281509399);
 }
 
-constexpr void test_softmax_cross_entropy()
+HOOLIB_CONSTEXPR void test_softmax_cross_entropy()
 {
-    constexpr auto ret = test_softmax_cross_entropy_detail();
-    static_assert(std::abs(std::get<0>(ret) - std::get<1>(ret)) < 1e-5);
+    HOOLIB_CONSTEXPR auto ret = test_softmax_cross_entropy_detail();
+    HOOLIB_STATIC_ASSERT(std::abs(std::get<0>(ret) - std::get<1>(ret)) < 1e-5);
 }

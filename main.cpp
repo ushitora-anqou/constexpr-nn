@@ -3,6 +3,11 @@
 #include <iostream>
 #include <tuple>
 
+#define HOOLIB_CONSTEXPR constexpr
+//#define HOOLIB_CONSTEXPR
+#define HOOLIB_STATIC_ASSERT static_assert
+//#define HOOLIB_STATIC_ASSERT
+
 ///////////////////////
 // N-by-M matrix
 //////////////////////
@@ -15,8 +20,8 @@ template <size_t N, size_t M>
 struct Matrix {
     float data[N][M];
 
-    constexpr Matrix() : data{} {};
-    constexpr Matrix<M, N> transposed() const
+    HOOLIB_CONSTEXPR Matrix() : data{} {};
+    HOOLIB_CONSTEXPR Matrix<M, N> transposed() const
     {
         Matrix<M, N> ret;
         for (size_t i = 0; i < N; i++)
@@ -24,32 +29,40 @@ struct Matrix {
         return ret;
     }
 
-    constexpr std::tuple<size_t, size_t> shape() const
+    HOOLIB_CONSTEXPR std::tuple<size_t, size_t> shape() const
     {
         return std::make_tuple(N, M);
     }
 
     // to get an element
-    constexpr float operator()(size_t i, size_t j) const { return data[i][j]; }
-    constexpr float& operator()(size_t i, size_t j) { return data[i][j]; }
+    HOOLIB_CONSTEXPR float operator()(size_t i, size_t j) const
+    {
+        return data[i][j];
+    }
+    HOOLIB_CONSTEXPR float& operator()(size_t i, size_t j)
+    {
+        return data[i][j];
+    }
     // for vector-like matrix
-    constexpr float operator()(size_t i) const { return data[0][i]; }
-    constexpr float& operator()(size_t i) { return data[0][i]; }
-    constexpr float operator[](size_t i) const { return (*this)(i); }
-    constexpr float& operator[](size_t i) { return (*this)(i); }
+    HOOLIB_CONSTEXPR float operator()(size_t i) const { return data[0][i]; }
+    HOOLIB_CONSTEXPR float& operator()(size_t i) { return data[0][i]; }
+    HOOLIB_CONSTEXPR float operator[](size_t i) const { return (*this)(i); }
+    HOOLIB_CONSTEXPR float& operator[](size_t i) { return (*this)(i); }
 
     template <size_t rN>
-    constexpr Matrix<N, M> operator+(const Matrix<rN, M>& rhs) const
+    HOOLIB_CONSTEXPR Matrix<N, M> operator+(const Matrix<rN, M>& rhs) const
     {
-        static_assert(rN == 1 || rN == N);
-        if constexpr (rN == 1) {
-            // broadcast
-            Matrix<N, M> ret;
-            for (size_t i = 0; i < N; i++)
-                for (size_t j = 0; j < M; j++)
-                    ret(i, j) = (*this)(i, j) + rhs[j];
-            return ret;
-        }
+        HOOLIB_STATIC_ASSERT(rN == 1 || rN == N);
+        if
+            HOOLIB_CONSTEXPR(rN == 1)
+            {
+                // broadcast
+                Matrix<N, M> ret;
+                for (size_t i = 0; i < N; i++)
+                    for (size_t j = 0; j < M; j++)
+                        ret(i, j) = (*this)(i, j) + rhs[j];
+                return ret;
+            }
         else {
             Matrix<N, M> ret;
             for (size_t i = 0; i < N; i++)
@@ -59,7 +72,7 @@ struct Matrix {
         }
     }
 
-    constexpr Matrix<N, M> operator*(float scalar) const
+    HOOLIB_CONSTEXPR Matrix<N, M> operator*(float scalar) const
     {
         Matrix<N, M> ret;
         for (size_t i = 0; i < N; i++)
@@ -68,7 +81,7 @@ struct Matrix {
     }
 
     template <size_t L>
-    constexpr Matrix<N, L> dot(const Matrix<M, L>& rhs) const
+    HOOLIB_CONSTEXPR Matrix<N, L> dot(const Matrix<M, L>& rhs) const
     {
         Matrix<N, L> ret;
         for (size_t i = 0; i < N; i++)
@@ -80,9 +93,11 @@ struct Matrix {
 };
 
 template <size_t lN, size_t lM, size_t rN, size_t rM>
-constexpr bool operator==(const Matrix<lN, lM>& lhs, const Matrix<rN, rM>& rhs)
+HOOLIB_CONSTEXPR bool operator==(const Matrix<lN, lM>& lhs,
+                                 const Matrix<rN, rM>& rhs)
 {
-    if constexpr (lN != rN || lM != rM) return false;
+    if
+        HOOLIB_CONSTEXPR(lN != rN || lM != rM) return false;
 
     for (size_t i = 0; i < lN; i++)
         for (size_t j = 0; j < lM; j++)
@@ -91,7 +106,8 @@ constexpr bool operator==(const Matrix<lN, lM>& lhs, const Matrix<rN, rM>& rhs)
 }
 
 template <size_t lN, size_t lM, size_t rN, size_t rM>
-constexpr bool operator!=(const Matrix<lN, lM>& lhs, const Matrix<rN, rM>& rhs)
+HOOLIB_CONSTEXPR bool operator!=(const Matrix<lN, lM>& lhs,
+                                 const Matrix<rN, rM>& rhs)
 {
     return !(lhs == rhs);
 }
@@ -105,16 +121,16 @@ struct Linear {
     Vector<OutSize> b, db;
     Matrix<BatchSize, InSize> x;
 
-    constexpr Linear() {}
+    HOOLIB_CONSTEXPR Linear() {}
 
-    constexpr Matrix<BatchSize, OutSize> forward(
+    HOOLIB_CONSTEXPR Matrix<BatchSize, OutSize> forward(
         const Matrix<BatchSize, InSize>& src)
     {
         x = src;
         return src.dot(W) + b;
     }
 
-    constexpr Matrix<BatchSize, InSize> backward(
+    HOOLIB_CONSTEXPR Matrix<BatchSize, InSize> backward(
         const Matrix<BatchSize, OutSize>& src)
     {
         auto dx = src.dot(W.transposed());
@@ -135,7 +151,7 @@ struct Linear {
 
 struct ReLU {
     template <size_t BatchSize, size_t InSize>
-    static constexpr Matrix<BatchSize, InSize> forward(
+    static HOOLIB_CONSTEXPR Matrix<BatchSize, InSize> forward(
         Matrix<BatchSize, InSize> src)
     {
         for (size_t i = 0; i < BatchSize; i++)
@@ -145,7 +161,7 @@ struct ReLU {
     }
 
     template <size_t BatchSize, size_t InSize>
-    static constexpr Matrix<BatchSize, InSize> backward(
+    static HOOLIB_CONSTEXPR Matrix<BatchSize, InSize> backward(
         Matrix<BatchSize, InSize> src)
     {
         for (size_t i = 0; i < BatchSize; i++)
@@ -159,8 +175,8 @@ template <size_t BatchSize, size_t InSize>
 struct SoftmaxCrossEntropy {
     Matrix<BatchSize, InSize> y, t;
 
-    constexpr float forward(Matrix<BatchSize, InSize> src,
-                            const Matrix<BatchSize, InSize>& t)
+    HOOLIB_CONSTEXPR float forward(Matrix<BatchSize, InSize> src,
+                                   const Matrix<BatchSize, InSize>& t)
     {
         // process softmax
         for (size_t i = 0; i < BatchSize; i++) {
@@ -191,7 +207,7 @@ struct SoftmaxCrossEntropy {
         return -loss_sum / BatchSize;
     }
 
-    constexpr Matrix<BatchSize, InSize> backward()
+    HOOLIB_CONSTEXPR Matrix<BatchSize, InSize> backward()
     {
         Matrix<BatchSize, InSize> dx;
         for (size_t i = 0; i < BatchSize; i++)
@@ -216,25 +232,32 @@ struct MLP3 {
 
     static constexpr size_t get_batch_size() { return BatchSize; }
 
-    constexpr auto forward(const Matrix<BatchSize, InSize>& src)
+    HOOLIB_CONSTEXPR auto predict(const Matrix<BatchSize, InSize>& src)
     {
-        constexpr auto h1 = ReLU::forward(l1.forward(src));
-        constexpr auto h2 = ReLU::forward(l2.forward(l1));
-        constexpr auto h3 = ReLU::forward(l3.forward(l2));
-        constexpr float loss = sce.forward(h3);
-        return std::make_tuple(h3, loss);
+        auto h1 = ReLU::forward(l1.forward(src));
+        auto h2 = ReLU::forward(l2.forward(h1));
+        auto h3 = ReLU::forward(l3.forward(h2));
+        return h3;
     }
 
-    constexpr void backward(float in = 1)
+    HOOLIB_CONSTEXPR auto forward(const Matrix<BatchSize, InSize>& src,
+                                  const Matrix<BatchSize, NOut>& t)
     {
-        constexpr auto h1 = sce.backward(in);
-        constexpr auto h2 = l3.backward(ReLU::backward(h1));
-        constexpr auto h3 = l2.backward(ReLU::backward(h2));
-        constexpr auto h4 = l1.backward(ReLU::backward(h3));
+        auto h3 = predict(src);
+        float loss = sce.forward(h3, t);
+        return loss;
+    }
+
+    HOOLIB_CONSTEXPR void backward()
+    {
+        auto h1 = sce.backward();
+        auto h2 = l3.backward(ReLU::backward(h1));
+        auto h3 = l2.backward(ReLU::backward(h2));
+        auto h4 = l1.backward(ReLU::backward(h3));
     }
 
     template <class SGD>
-    constexpr void update(SGD sgd)
+    HOOLIB_CONSTEXPR void update(SGD sgd)
     {
         l1.update(sgd);
         l2.update(sgd);
@@ -243,20 +266,19 @@ struct MLP3 {
 };
 
 template <class NN, size_t N, size_t InSize>
-constexpr auto predict(NN nn, const Matrix<N, InSize>& src)
+HOOLIB_CONSTEXPR auto predict(NN nn, const Matrix<N, InSize>& src)
 {
-    static_assert(N <= NN::get_batch_size());
-    Matrix<NN::get_batch_size, InSize> in;
+    HOOLIB_STATIC_ASSERT(N <= NN::get_batch_size());
+    Matrix<NN::get_batch_size(), InSize> batch;
     for (size_t i = 0; i < N; i++)
-        for (size_t j = 0; j < InSize; j++) in(i, j) = src(i, j);
-    constexpr auto res = nn.forward(in);
+        for (size_t j = 0; j < InSize; j++) batch(i, j) = src(i, j);
+    auto res = nn.predict(batch);
 
     auto ret = std::array<size_t, N>();
     for (size_t i = 0; i < N; i++) {
         size_t argmax = 0;
-        for (size_t j = 0; j < res.shape()[1]; j++)
-            if (std::get<0>(res)(i, argmax) < std::get<0>(res)(i, j))
-                argmax = j;
+        for (size_t j = 0; j < std::get<1>(res.shape()); j++)
+            if (res(i, argmax) < res(i, j)) argmax = j;
         ret[i] = argmax;
     }
 
@@ -266,7 +288,7 @@ constexpr auto predict(NN nn, const Matrix<N, InSize>& src)
 struct SGD {
     float lr;
 
-    constexpr SGD(float alr) : lr(alr) {}
+    HOOLIB_CONSTEXPR SGD(float alr) : lr(alr) {}
 
     template <size_t BatchSize, size_t Size>
     Matrix<BatchSize, Size> operator()(const Matrix<BatchSize, Size>& W,
@@ -276,4 +298,48 @@ struct SGD {
     }
 };
 
-int main() {}
+#include "mnist.cpp"
+
+HOOLIB_CONSTEXPR float train()
+{
+    constexpr size_t batch_size = 1;
+    constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
+    constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
+    constexpr size_t train_sample_num = 1, train_sample_size = 764;
+    MLP3<batch_size, train_sample_size, 100, 10> nn;
+
+    for (size_t bi = 0; bi < train_sample_num / batch_size; bi++) {
+        Matrix<batch_size, train_sample_size> batch;
+        Matrix<batch_size, 10> onehot_t;
+        for (size_t i = 0; i < batch_size; i++) {
+            for (size_t j = 0; j < train_sample_size; j++)
+                batch(i, j) = train_x[bi * batch_size + i][j];
+            onehot_t(i, train_t[bi * batch_size + i]) = 1;
+        }
+        nn.forward(batch, onehot_t);
+        nn.backward();
+        nn.update(SGD(0.1));
+    }
+
+    constexpr auto& test_x = MNIST_TEST_SAMPLES_X;
+    constexpr auto& test_t = MNIST_TEST_SAMPLES_T;
+    constexpr size_t test_sample_num = 1, test_sample_size = 764;
+
+    size_t correct_count = 0;
+    for (size_t bi = 0; bi < test_sample_num / batch_size; bi++) {
+        Matrix<batch_size, test_sample_size> batch;
+        for (size_t i = 0; i < batch_size; i++)
+            for (size_t j = 0; j < test_sample_size; j++)
+                batch(i, j) = test_x[bi * batch_size + i][j];
+        auto y = predict(nn, batch);
+
+        bool all_true = true;
+        for (size_t i = 0; i < batch_size; i++)
+            if (test_t[bi * batch_size + i] != y[i]) all_true = false;
+        if (all_true) correct_count++;
+    }
+
+    return static_cast<float>(correct_count) / test_sample_num;
+}
+
+int main() { std::cout << train() << std::endl; }
