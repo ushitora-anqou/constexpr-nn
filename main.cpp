@@ -3,10 +3,31 @@
 #include <iostream>
 #include <tuple>
 
+#include <sprout/math/exp.hpp>
+#include <sprout/math/sqrt.hpp>
+#include <sprout/random/mersenne_twister.hpp>
+#include <sprout/random/normal_distribution.hpp>
+#include <sprout/random/unique_seed.hpp>
+
 #define HOOLIB_CONSTEXPR constexpr
 //#define HOOLIB_CONSTEXPR
 #define HOOLIB_STATIC_ASSERT static_assert
 //#define HOOLIB_STATIC_ASSERT
+
+//////////////////////
+/// Random
+//////////////////////
+struct Random {
+    sprout::random::mt19937 randgen;
+
+    constexpr Random(size_t seed) : randgen(seed) {}
+
+    constexpr float normal_dist(float mean, float std)
+    {
+        auto dist = sprout::random::normal_distribution(mean, std);
+        return dist(randgen);
+    }
+};
 
 ///////////////////////
 // N-by-M matrix
@@ -188,7 +209,7 @@ struct SoftmaxCrossEntropy {
             // s = sum src[i]
             float s = 0;
             for (size_t j = 0; j < InSize; j++) {
-                src(i, j) = std::exp(src(i, j) - c);
+                src(i, j) = sprout::math::exp(src(i, j) - c);
                 s += src(i, j);
             }
 
@@ -229,6 +250,21 @@ struct MLP3 {
     Linear<BatchSize, NUnit, NUnit> l2;
     Linear<BatchSize, NUnit, NOut> l3;
     SoftmaxCrossEntropy<BatchSize, NOut> sce;
+
+    HOOLIB_CONSTEXPR MLP3()
+    {
+        // He init
+        Random rand = SPROUT_UNIQUE_SEED;
+        for (size_t i = 0; i < InSize; i++)
+            for (size_t j = 0; j < NUnit; j++)
+                l1.W(i, j) = rand.normal_dist(0, std::sqrt(2. / InSize));
+        for (size_t i = 0; i < NUnit; i++)
+            for (size_t j = 0; j < NUnit; j++)
+                l2.W(i, j) = rand.normal_dist(0, std::sqrt(2. / NUnit));
+        for (size_t i = 0; i < NUnit; i++)
+            for (size_t j = 0; j < NUnit; j++)
+                l3.W(i, j) = rand.normal_dist(0, std::sqrt(2. / NUnit));
+    }
 
     static constexpr size_t get_batch_size() { return BatchSize; }
 
@@ -342,4 +378,11 @@ HOOLIB_CONSTEXPR float train()
     return static_cast<float>(correct_count) / test_sample_num;
 }
 
-int main() { std::cout << train() << std::endl; }
+int main()
+{
+    Random rand = SPROUT_UNIQUE_SEED;
+    std::cout << rand.normal_dist(0, 1) << std::endl;
+    std::cout << rand.normal_dist(0, 1) << std::endl;
+
+    std::cout << train() << std::endl;
+}

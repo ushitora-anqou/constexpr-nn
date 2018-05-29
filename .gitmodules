@@ -1,0 +1,3 @@
+[submodule "vendor/Sprout"]
+	path = vendor/Sprout
+	url = https://github.com/bolero-MURAKAMI/Sprout.git
