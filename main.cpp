@@ -1,5 +1,6 @@
 #include <array>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <tuple>
 
@@ -287,9 +288,9 @@ struct MLP3 {
     HOOLIB_CONSTEXPR void backward()
     {
         auto h1 = sce.backward();
-        auto h2 = l3.backward(ReLU::backward(h1));
+        auto h2 = l3.backward(h1);
         auto h3 = l2.backward(ReLU::backward(h2));
-        auto h4 = l1.backward(h3);
+        auto h4 = l1.backward(ReLU::backward(h3));
     }
 
     template <class SGD>
@@ -336,23 +337,17 @@ struct SGD {
 
 #include "mnist.cpp"
 
-template<class NN>
-HOOLIB_CONSTEXPR std::tuple<float, float, float> train_epoch(NN& nn)
-{
-}
-
-template<size_t Epoch>
+template <size_t Epoch>
 HOOLIB_CONSTEXPR auto train()
 {
+    constexpr size_t batch_size = 1;
+    constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
+    constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
+    constexpr size_t train_sample_num = 2, train_sample_size = 764;
     std::array<std::tuple<float, float>, Epoch> ret;
+    MLP3<batch_size, train_sample_size, 100, 10> nn;
 
-    for(int i = 0; i < Epoch; i++){
-        constexpr size_t batch_size = 1;
-        constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
-        constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
-        constexpr size_t train_sample_num = 2, train_sample_size = 764;
-        MLP3<batch_size, train_sample_size, 100, 10> nn;
-
+    for (size_t i = 0; i < Epoch; i++) {
         float train_loss = 0;
         for (size_t bi = 0; bi < train_sample_num / batch_size; bi++) {
             Matrix<batch_size, train_sample_size> batch;
@@ -383,11 +378,11 @@ HOOLIB_CONSTEXPR auto train()
             auto y = predict(nn, batch);
 
             for (size_t i = 0; i < batch_size; i++)
-                if (test_t[bi * batch_size + i] != y[i]) correct_count++;
+                if (test_t[bi * batch_size + i] == y[i]) correct_count++;
         }
 
         ret[i] = std::make_tuple(
-                train_loss, static_cast<float>(correct_count) / test_sample_num);
+            train_loss, static_cast<float>(correct_count) / test_sample_num);
     }
 
     return ret;
@@ -395,8 +390,9 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    auto res = train<2>();
-    for(auto&& r : res)
-        std::cout << "train loss: " << std::get<0>(r) << std::endl
-            << "test accuracy: " << std::get<1>(r) << std::endl;
+    auto res = train<100>();
+    for (auto&& r : res)
+        std::cout << std::setprecision(10) << "train loss: " << std::get<0>(r)
+                  << std::endl
+                  << "test accuracy: " << std::get<1>(r) << std::endl;
 }
