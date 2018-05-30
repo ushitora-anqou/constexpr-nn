@@ -1,8 +1,8 @@
 import chainer
 
-train_sample_num = 1
+train_sample_num = 2
 train_sample_size = 764
-test_sample_num = 1
+test_sample_num = 2
 test_sample_size = 764
 
 mnist = chainer.datasets.get_mnist()

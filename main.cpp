@@ -9,10 +9,10 @@
 #include <sprout/random/normal_distribution.hpp>
 #include <sprout/random/unique_seed.hpp>
 
-#define HOOLIB_CONSTEXPR constexpr
-//#define HOOLIB_CONSTEXPR
-#define HOOLIB_STATIC_ASSERT static_assert
-//#define HOOLIB_STATIC_ASSERT
+//#define HOOLIB_CONSTEXPR constexpr
+#define HOOLIB_CONSTEXPR
+//#define HOOLIB_STATIC_ASSERT static_assert
+#define HOOLIB_STATIC_ASSERT
 
 //////////////////////
 /// Random
@@ -24,7 +24,7 @@ struct Random {
 
     constexpr float normal_dist(float mean, float std)
     {
-        auto dist = sprout::random::normal_distribution(mean, std);
+        auto dist = sprout::random::normal_distribution<float>(mean, std);
         return dist(randgen);
     }
 };
@@ -272,7 +272,7 @@ struct MLP3 {
     {
         auto h1 = ReLU::forward(l1.forward(src));
         auto h2 = ReLU::forward(l2.forward(h1));
-        auto h3 = ReLU::forward(l3.forward(h2));
+        auto h3 = l3.forward(h2);
         return h3;
     }
 
@@ -289,7 +289,7 @@ struct MLP3 {
         auto h1 = sce.backward();
         auto h2 = l3.backward(ReLU::backward(h1));
         auto h3 = l2.backward(ReLU::backward(h2));
-        auto h4 = l1.backward(ReLU::backward(h3));
+        auto h4 = l1.backward(h3);
     }
 
     template <class SGD>
@@ -336,53 +336,67 @@ struct SGD {
 
 #include "mnist.cpp"
 
-HOOLIB_CONSTEXPR float train()
+template<class NN>
+HOOLIB_CONSTEXPR std::tuple<float, float, float> train_epoch(NN& nn)
 {
-    constexpr size_t batch_size = 1;
-    constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
-    constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
-    constexpr size_t train_sample_num = 1, train_sample_size = 764;
-    MLP3<batch_size, train_sample_size, 100, 10> nn;
+}
 
-    for (size_t bi = 0; bi < train_sample_num / batch_size; bi++) {
-        Matrix<batch_size, train_sample_size> batch;
-        Matrix<batch_size, 10> onehot_t;
-        for (size_t i = 0; i < batch_size; i++) {
-            for (size_t j = 0; j < train_sample_size; j++)
-                batch(i, j) = train_x[bi * batch_size + i][j];
-            onehot_t(i, train_t[bi * batch_size + i]) = 1;
+template<size_t Epoch>
+HOOLIB_CONSTEXPR auto train()
+{
+    std::array<std::tuple<float, float>, Epoch> ret;
+
+    for(int i = 0; i < Epoch; i++){
+        constexpr size_t batch_size = 1;
+        constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
+        constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
+        constexpr size_t train_sample_num = 2, train_sample_size = 764;
+        MLP3<batch_size, train_sample_size, 100, 10> nn;
+
+        float train_loss = 0;
+        for (size_t bi = 0; bi < train_sample_num / batch_size; bi++) {
+            Matrix<batch_size, train_sample_size> batch;
+            Matrix<batch_size, 10> onehot_t;
+            for (size_t i = 0; i < batch_size; i++) {
+                for (size_t j = 0; j < train_sample_size; j++)
+                    batch(i, j) = train_x[bi * batch_size + i][j];
+                onehot_t(i, train_t[bi * batch_size + i]) = 1;
+            }
+            float loss = nn.forward(batch, onehot_t);
+            train_loss += loss;
+
+            nn.backward();
+            nn.update(SGD(0.1));
         }
-        nn.forward(batch, onehot_t);
-        nn.backward();
-        nn.update(SGD(0.1));
+        train_loss /= (train_sample_num / batch_size);
+
+        constexpr auto& test_x = MNIST_TEST_SAMPLES_X;
+        constexpr auto& test_t = MNIST_TEST_SAMPLES_T;
+        constexpr size_t test_sample_num = 2, test_sample_size = 764;
+
+        size_t correct_count = 0;
+        for (size_t bi = 0; bi < test_sample_num / batch_size; bi++) {
+            Matrix<batch_size, test_sample_size> batch;
+            for (size_t i = 0; i < batch_size; i++)
+                for (size_t j = 0; j < test_sample_size; j++)
+                    batch(i, j) = test_x[bi * batch_size + i][j];
+            auto y = predict(nn, batch);
+
+            for (size_t i = 0; i < batch_size; i++)
+                if (test_t[bi * batch_size + i] != y[i]) correct_count++;
+        }
+
+        ret[i] = std::make_tuple(
+                train_loss, static_cast<float>(correct_count) / test_sample_num);
     }
 
-    constexpr auto& test_x = MNIST_TEST_SAMPLES_X;
-    constexpr auto& test_t = MNIST_TEST_SAMPLES_T;
-    constexpr size_t test_sample_num = 1, test_sample_size = 764;
-
-    size_t correct_count = 0;
-    for (size_t bi = 0; bi < test_sample_num / batch_size; bi++) {
-        Matrix<batch_size, test_sample_size> batch;
-        for (size_t i = 0; i < batch_size; i++)
-            for (size_t j = 0; j < test_sample_size; j++)
-                batch(i, j) = test_x[bi * batch_size + i][j];
-        auto y = predict(nn, batch);
-
-        bool all_true = true;
-        for (size_t i = 0; i < batch_size; i++)
-            if (test_t[bi * batch_size + i] != y[i]) all_true = false;
-        if (all_true) correct_count++;
-    }
-
-    return static_cast<float>(correct_count) / test_sample_num;
+    return ret;
 }
 
 int main()
 {
-    Random rand = SPROUT_UNIQUE_SEED;
-    std::cout << rand.normal_dist(0, 1) << std::endl;
-    std::cout << rand.normal_dist(0, 1) << std::endl;
-
-    std::cout << train() << std::endl;
+    auto res = train<2>();
+    for(auto&& r : res)
+        std::cout << "train loss: " << std::get<0>(r) << std::endl
+            << "test accuracy: " << std::get<1>(r) << std::endl;
 }
