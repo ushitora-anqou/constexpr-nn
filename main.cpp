@@ -401,7 +401,7 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    constexpr auto res = train<100>();
+    constexpr auto res = train<10>();
     for (auto&& r : res)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
