@@ -5,15 +5,23 @@
 #include <tuple>
 
 #include <sprout/math/exp.hpp>
+#include <sprout/math/log.hpp>
 #include <sprout/math/sqrt.hpp>
 #include <sprout/random/mersenne_twister.hpp>
 #include <sprout/random/normal_distribution.hpp>
 #include <sprout/random/unique_seed.hpp>
 
+#define HOOLIB_ENABLE_CONSTEXPR
+
+#ifdef HOOLIB_ENABLE_CONSTEXPR
 #define HOOLIB_CONSTEXPR constexpr
-//#define HOOLIB_CONSTEXPR
 #define HOOLIB_STATIC_ASSERT static_assert
-//#define HOOLIB_STATIC_ASSERT
+#define HOOOLIB_IF_CONSTEXPR if constexpr
+#else
+#define HOOLIB_CONSTEXPR
+#define HOOLIB_STATIC_ASSERT
+#define HOOOLIB_IF_CONSTEXPR if
+#endif
 
 //////////////////////
 /// Random
@@ -75,16 +83,14 @@ struct Matrix {
     HOOLIB_CONSTEXPR Matrix<N, M> operator+(const Matrix<rN, M>& rhs) const
     {
         HOOLIB_STATIC_ASSERT(rN == 1 || rN == N);
-        if
-            HOOLIB_CONSTEXPR(rN == 1)
-            {
-                // broadcast
-                Matrix<N, M> ret;
-                for (size_t i = 0; i < N; i++)
-                    for (size_t j = 0; j < M; j++)
-                        ret(i, j) = (*this)(i, j) + rhs[j];
-                return ret;
-            }
+        if (rN == 1) {
+            // broadcast
+            Matrix<N, M> ret;
+            for (size_t i = 0; i < N; i++)
+                for (size_t j = 0; j < M; j++)
+                    ret(i, j) = (*this)(i, j) + rhs[j];
+            return ret;
+        }
         else {
             Matrix<N, M> ret;
             for (size_t i = 0; i < N; i++)
@@ -118,8 +124,7 @@ template <size_t lN, size_t lM, size_t rN, size_t rM>
 HOOLIB_CONSTEXPR bool operator==(const Matrix<lN, lM>& lhs,
                                  const Matrix<rN, rM>& rhs)
 {
-    if
-        HOOLIB_CONSTEXPR(lN != rN || lM != rM) return false;
+    if (lN != rN || lM != rM) return false;
 
     for (size_t i = 0; i < lN; i++)
         for (size_t j = 0; j < lM; j++)
@@ -224,7 +229,7 @@ struct SoftmaxCrossEntropy {
         float loss_sum = 0;
         for (size_t i = 0; i < BatchSize; i++)
             for (size_t j = 0; j < InSize; j++)
-                loss_sum += t(i, j) * std::log(src(i, j));
+                loss_sum += t(i, j) * sprout::math::log(src(i, j));
 
         return -loss_sum / BatchSize;
     }
@@ -401,7 +406,7 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    constexpr auto res = train<10>();
+    constexpr auto res = train<100>();
     for (auto&& r : res)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
