@@ -10,10 +10,10 @@
 #include <sprout/random/normal_distribution.hpp>
 #include <sprout/random/unique_seed.hpp>
 
-//#define HOOLIB_CONSTEXPR constexpr
-#define HOOLIB_CONSTEXPR
-//#define HOOLIB_STATIC_ASSERT static_assert
-#define HOOLIB_STATIC_ASSERT
+#define HOOLIB_CONSTEXPR constexpr
+//#define HOOLIB_CONSTEXPR
+#define HOOLIB_STATIC_ASSERT static_assert
+//#define HOOLIB_STATIC_ASSERT
 
 //////////////////////
 /// Random
@@ -164,7 +164,7 @@ struct Linear {
     }
 
     template <class SGD>
-    void update(SGD sgd)
+    HOOLIB_CONSTEXPR void update(SGD sgd)
     {
         W = sgd(W, dW);
         b = sgd(b, db);
@@ -239,7 +239,7 @@ struct SoftmaxCrossEntropy {
     }
 };
 
-#include "test.cpp"
+//#include "test.cpp"
 
 /////////////////////
 //// main
@@ -258,13 +258,16 @@ struct MLP3 {
         Random rand = SPROUT_UNIQUE_SEED;
         for (size_t i = 0; i < InSize; i++)
             for (size_t j = 0; j < NUnit; j++)
-                l1.W(i, j) = rand.normal_dist(0, std::sqrt(2. / InSize));
+                l1.W(i, j) =
+                    rand.normal_dist(0, sprout::math::sqrt(2. / InSize));
         for (size_t i = 0; i < NUnit; i++)
             for (size_t j = 0; j < NUnit; j++)
-                l2.W(i, j) = rand.normal_dist(0, std::sqrt(2. / NUnit));
+                l2.W(i, j) =
+                    rand.normal_dist(0, sprout::math::sqrt(2. / NUnit));
         for (size_t i = 0; i < NUnit; i++)
-            for (size_t j = 0; j < NUnit; j++)
-                l3.W(i, j) = rand.normal_dist(0, std::sqrt(2. / NUnit));
+            for (size_t j = 0; j < NOut; j++)
+                l3.W(i, j) =
+                    rand.normal_dist(0, sprout::math::sqrt(2. / NUnit));
     }
 
     static constexpr size_t get_batch_size() { return BatchSize; }
@@ -328,14 +331,21 @@ struct SGD {
     HOOLIB_CONSTEXPR SGD(float alr) : lr(alr) {}
 
     template <size_t BatchSize, size_t Size>
-    Matrix<BatchSize, Size> operator()(const Matrix<BatchSize, Size>& W,
-                                       const Matrix<BatchSize, Size>& dW)
+    HOOLIB_CONSTEXPR Matrix<BatchSize, Size> operator()(
+        const Matrix<BatchSize, Size>& W, const Matrix<BatchSize, Size>& dW)
     {
         return W + dW * -lr;
     }
 };
 
 #include "mnist.cpp"
+
+struct TrainResult {
+    float train_loss;
+    float test_accuracy;
+
+    HOOLIB_CONSTEXPR TrainResult() : train_loss(0), test_accuracy(0) {}
+};
 
 template <size_t Epoch>
 HOOLIB_CONSTEXPR auto train()
@@ -344,7 +354,7 @@ HOOLIB_CONSTEXPR auto train()
     constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
     constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
     constexpr size_t train_sample_num = 2, train_sample_size = 764;
-    std::array<std::tuple<float, float>, Epoch> ret;
+    std::array<TrainResult, Epoch> ret;
     MLP3<batch_size, train_sample_size, 100, 10> nn;
 
     for (size_t i = 0; i < Epoch; i++) {
@@ -381,8 +391,9 @@ HOOLIB_CONSTEXPR auto train()
                 if (test_t[bi * batch_size + i] == y[i]) correct_count++;
         }
 
-        ret[i] = std::make_tuple(
-            train_loss, static_cast<float>(correct_count) / test_sample_num);
+        ret[i].train_loss = train_loss;
+        ret[i].test_accuracy =
+            static_cast<float>(correct_count) / test_sample_num;
     }
 
     return ret;
@@ -390,9 +401,9 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    auto res = train<100>();
+    constexpr auto res = train<100>();
     for (auto&& r : res)
-        std::cout << std::setprecision(10) << "train loss: " << std::get<0>(r)
+        std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
-                  << "test accuracy: " << std::get<1>(r) << std::endl;
+                  << "test accuracy: " << r.test_accuracy << std::endl;
 }
