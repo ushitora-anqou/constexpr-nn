@@ -26,15 +26,42 @@
 //////////////////////
 /// Random
 //////////////////////
+/*
 struct Random {
     sprout::random::mt19937 randgen;
 
-    constexpr Random(size_t seed) : randgen(seed) {}
+    constexpr Random(uint64_t seed) : randgen(seed) {}
+
+    constexpr float uniform_dist()
+    {
+        return static_cast<float>(randgen() - randgen.min()) /
+               static_cast<float>(randgen.max() - randgen.min());
+    }
 
     constexpr float normal_dist(float mean, float std)
     {
-        auto dist = sprout::random::normal_distribution<float>(mean, std);
-        return dist(randgen);
+        constexpr double pi = 3.1415926535897932384626433832795028f;
+        double z = sprout::math::sqrt(-2. * sprout::math::log(uniform_dist())) *
+                   sprout::math::sin(2. * pi * uniform_dist());
+        return z * std + mean;
+        // auto dist = sprout::random::normal_distribution<float>(mean, std);
+        // return dist(randgen);
+    }
+};
+*/
+#include "normal_distribution.cpp"
+struct Random {
+    static constexpr size_t SIZE =
+        sizeof(RANDOM_NORMAL_DIST_TABLE) / sizeof(float);
+    size_t index;
+
+    constexpr Random(uint64_t seed) : index(seed % SIZE) {}
+
+    constexpr float normal_dist(float mean, float std)
+    {
+        float ret = RANDOM_NORMAL_DIST_TABLE[index] * std + mean;
+        index = (index + 1) % SIZE;
+        return ret;
     }
 };
 
