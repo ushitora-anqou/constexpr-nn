@@ -19,7 +19,8 @@ C++17のconstexprを使ってニューラルネットワークを **コンパイ
 - `git submodule init`
 - `git submodule update`
 - `python mnist.py`
+- 'python random_table.py`
 - `make`
-    - 時間がかかる可能性があるので注意。
+    - 時間がかかる可能性があるので注意。他の仕事をすませると良い。散歩するとか。
 - `./main`
 
