@@ -49,18 +49,34 @@ struct Random {
     }
 };
 */
-#include "normal_distribution.cpp"
+#include "random_table.cpp"
 struct Random {
-    static constexpr size_t SIZE =
-        sizeof(RANDOM_NORMAL_DIST_TABLE) / sizeof(float);
-    size_t index;
+    static constexpr size_t NORMAL_DIST_SIZE =
+                                sizeof(RANDOM_NORMAL_DIST_TABLE) /
+                                sizeof(float),
+                            UNIFORM_DIST_SIZE =
+                                sizeof(RANDOM_UNIFORM_DIST_TABLE) /
+                                sizeof(float);
+    size_t normal_index, uniform_index;
 
-    constexpr Random(uint64_t seed) : index(seed % SIZE) {}
+    constexpr Random(uint64_t seed)
+        : normal_index(seed % NORMAL_DIST_SIZE),
+          uniform_index(seed % UNIFORM_DIST_SIZE)
+    {
+    }
+
+    constexpr float uniform_dist(float low, float high)
+    {
+        float ret =
+            RANDOM_UNIFORM_DIST_TABLE[uniform_index] * (high - low) + low;
+        uniform_index = (uniform_index + 1) % UNIFORM_DIST_SIZE;
+        return ret;
+    }
 
     constexpr float normal_dist(float mean, float std)
     {
-        float ret = RANDOM_NORMAL_DIST_TABLE[index] * std + mean;
-        index = (index + 1) % SIZE;
+        float ret = RANDOM_NORMAL_DIST_TABLE[normal_index] * std + mean;
+        normal_index = (normal_index + 1) % NORMAL_DIST_SIZE;
         return ret;
     }
 };
@@ -77,7 +93,11 @@ template <size_t N, size_t M>
 struct Matrix {
     float data[N][M];
 
-    HOOLIB_CONSTEXPR Matrix() : data{} {};
+    HOOLIB_CONSTEXPR Matrix() : data{}
+    {
+        HOOLIB_STATIC_ASSERT(N >= 1 && M >= 1);
+    }
+
     HOOLIB_CONSTEXPR Matrix<M, N> transposed() const
     {
         Matrix<M, N> ret;
@@ -86,9 +106,9 @@ struct Matrix {
         return ret;
     }
 
-    HOOLIB_CONSTEXPR std::tuple<size_t, size_t> shape() const
+    static HOOLIB_CONSTEXPR std::pair<size_t, size_t> shape()
     {
-        return std::make_tuple(N, M);
+        return std::make_pair(N, M);
     }
 
     // to get an element
@@ -390,7 +410,7 @@ HOOLIB_CONSTEXPR auto predict(NN nn, const Matrix<N, InSize>& src)
     auto ret = std::array<size_t, N>();
     for (size_t i = 0; i < N; i++) {
         size_t argmax = 0;
-        for (size_t j = 0; j < std::get<1>(res.shape()); j++)
+        for (size_t j = 0; j < decltype(res)::shape().second; j++)
             if (res(i, argmax) < res(i, j)) argmax = j;
         ret[i] = argmax;
     }
@@ -492,49 +512,99 @@ struct TrainResult {
     HOOLIB_CONSTEXPR TrainResult() : train_loss(0), test_accuracy(0) {}
 };
 
+template <class MatX, class MatT>
+struct Dataset {
+    MatX ds_x;
+    MatT ds_t;
+    size_t index;
+    Random rnd;
+    bool shuffled;
+
+    HOOLIB_CONSTEXPR Dataset(const MatX& ax, const MatT& at, bool shd)
+        : ds_x(ax), ds_t(at), index(0), rnd(SPROUT_UNIQUE_SEED), shuffled(shd)
+    {
+        HOOLIB_STATIC_ASSERT(MatX::shape().first == MatT::shape().first);
+    }
+
+    template <size_t BatchSize>
+    HOOLIB_CONSTEXPR auto next()
+    {
+        Matrix<BatchSize, MatX::shape().second> ret_x;
+        Matrix<BatchSize, MatT::shape().second> ret_t;
+        for (size_t i = 0; i < BatchSize; i++) {
+            for (size_t j = 0; j < MatX::shape().second; j++)
+                ret_x(i, j) = ds_x(index, j);
+            for (size_t j = 0; j < MatT::shape().second; j++)
+                ret_t(i, j) = ds_t(index, j);
+            if (shuffled)
+                index = rnd.uniform_dist(0, MatX::shape().first);
+            else
+                index = (index + 1) % MatX::shape().first;
+        }
+        return std::make_pair(ret_x, ret_t);
+    }
+};
+
+template <size_t N, size_t M>
+HOOLIB_CONSTEXPR auto matrix_from_array(float const src[N][M])
+{
+    Matrix<N, M> ret;
+
+    for (size_t i = 0; i < N; i++)
+        for (size_t j = 0; j < M; j++) ret(i, j) = src[i][j];
+
+    return ret;
+}
+
+template <size_t N, size_t L>
+HOOLIB_CONSTEXPR Matrix<N, L> onehot_from_array(const size_t* const src)
+{
+    Matrix<N, L> ret;
+    for (size_t i = 0; i < N; i++) ret(i, src[i]) = 1.;
+    return ret;
+}
+
 template <size_t Epoch>
 HOOLIB_CONSTEXPR auto train()
 {
+    // dataset
     constexpr size_t batch_size = 1;
-    constexpr auto& train_x = MNIST_TRAIN_SAMPLES_X;
-    constexpr auto& train_t = MNIST_TRAIN_SAMPLES_T;
     constexpr size_t train_sample_num = 2, train_sample_size = 764;
-    std::array<TrainResult, Epoch> ret;
+    auto train_dataset = Dataset(
+        matrix_from_array<train_sample_num, train_sample_size>(
+            MNIST_TRAIN_SAMPLES_X),
+        onehot_from_array<train_sample_num, 10>(MNIST_TRAIN_SAMPLES_T), true);
+    constexpr size_t test_sample_num = 2, test_sample_size = 764;
+    auto test_dataset = Dataset(
+        matrix_from_array<test_sample_num, test_sample_size>(
+            MNIST_TEST_SAMPLES_X),
+        onehot_from_array<test_sample_num, 10>(MNIST_TEST_SAMPLES_T), false);
+
+    // nn
     MLP3<batch_size, train_sample_size, 100, 10> nn;
     auto optimizers = nn.generate_optimizers(AdamGenerator());
 
+    // result
+    std::array<TrainResult, Epoch> ret;
+
+    // learning loop
     for (size_t i = 0; i < Epoch; i++) {
         float train_loss = 0;
         for (size_t bi = 0; bi < train_sample_num / batch_size; bi++) {
-            Matrix<batch_size, train_sample_size> batch;
-            Matrix<batch_size, 10> onehot_t;
-            for (size_t i = 0; i < batch_size; i++) {
-                for (size_t j = 0; j < train_sample_size; j++)
-                    batch(i, j) = train_x[bi * batch_size + i][j];
-                onehot_t(i, train_t[bi * batch_size + i]) = 1;
-            }
-            float loss = nn.forward(batch, onehot_t);
-            train_loss += loss;
-
+            auto [batch, onehot_t] = train_dataset.next<batch_size>();
+            train_loss += nn.forward(batch, onehot_t);
             nn.backward();
             std::apply(CallOptimizer(), optimizers);
         }
         train_loss /= (train_sample_num / batch_size);
 
-        constexpr auto& test_x = MNIST_TEST_SAMPLES_X;
-        constexpr auto& test_t = MNIST_TEST_SAMPLES_T;
-        constexpr size_t test_sample_num = 2, test_sample_size = 764;
-
         size_t correct_count = 0;
         for (size_t bi = 0; bi < test_sample_num / batch_size; bi++) {
-            Matrix<batch_size, test_sample_size> batch;
-            for (size_t i = 0; i < batch_size; i++)
-                for (size_t j = 0; j < test_sample_size; j++)
-                    batch(i, j) = test_x[bi * batch_size + i][j];
+            auto [batch, ans] = test_dataset.next<batch_size>();
             auto y = predict(nn, batch);
 
             for (size_t i = 0; i < batch_size; i++)
-                if (test_t[bi * batch_size + i] == y[i]) correct_count++;
+                if (ans[y[i]] > 0.5) correct_count++;
         }
 
         ret[i].train_loss = train_loss;
@@ -547,7 +617,7 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    constexpr auto res = train<100>();
+    constexpr auto res = train<1>();
     for (auto&& r : res)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl

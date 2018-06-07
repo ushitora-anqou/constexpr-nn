@@ -4,8 +4,7 @@
 
 HOOLIB_CONSTEXPR void test_matrix_shape()
 {
-    Matrix<2, 3> mat;
-    HOOLIB_STATIC_ASSERT(mat.shape() == std::tuple<size_t, size_t>(2, 3));
+    HOOLIB_STATIC_ASSERT(Matrix<2, 3>::shape() == std::make_pair(2ul, 3ul));
 }
 
 HOOLIB_CONSTEXPR auto test_matrix_equal1_detail()
