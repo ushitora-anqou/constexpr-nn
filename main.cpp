@@ -194,13 +194,6 @@ struct Linear {
             for (size_t j = 0; j < OutSize; j++) db[j] += src(i, j);
         return dx;
     }
-
-    template <class SGD>
-    HOOLIB_CONSTEXPR void update(SGD sgd)
-    {
-        W = sgd(W, dW);
-        b = sgd(b, db);
-    }
 };
 
 struct ReLU {
@@ -328,12 +321,12 @@ struct MLP3 {
         auto h4 = l1.backward(ReLU::backward(h3));
     }
 
-    template <class SGD>
-    HOOLIB_CONSTEXPR void update(SGD sgd)
+    template <class OptimizerGenerator>
+    HOOLIB_CONSTEXPR auto generate_optimizers(OptimizerGenerator gen)
     {
-        l1.update(sgd);
-        l2.update(sgd);
-        l3.update(sgd);
+        return std::make_tuple(gen(l1.W, l1.dW), gen(l1.b, l1.db),
+                               gen(l2.W, l2.dW), gen(l2.b, l2.db),
+                               gen(l3.W, l3.dW), gen(l3.b, l3.db));
     }
 };
 
@@ -357,6 +350,31 @@ HOOLIB_CONSTEXPR auto predict(NN nn, const Matrix<N, InSize>& src)
     return ret;
 }
 
+template <class Mat>
+struct Adam {
+    float lr;
+    Mat &W, dW;
+
+    // TODO
+    HOOLIB_CONSTEXPR Adam(float alr, Mat& aW, Mat& adW)
+        : lr(alr), W(aW), dW(adW)
+    {
+    }
+
+    HOOLIB_CONSTEXPR void operator()() { W = W + dW * -lr; }
+};
+
+struct AdamGenerator {
+    float lr;
+    HOOLIB_CONSTEXPR AdamGenerator(float alr) : lr(alr) {}
+
+    template <class Mat>
+    HOOLIB_CONSTEXPR Adam<Mat> operator()(Mat& W, Mat& dW)
+    {
+        return Adam(lr, W, dW);
+    }
+};
+
 struct SGD {
     float lr;
 
@@ -367,6 +385,21 @@ struct SGD {
         const Matrix<BatchSize, Size>& W, const Matrix<BatchSize, Size>& dW)
     {
         return W + dW * -lr;
+    }
+};
+
+struct CallOptimizer {
+    template <class Optimizer, class... Tail>
+    HOOLIB_CONSTEXPR void operator()(Optimizer&& op, Tail&&... tail)
+    {
+        op();
+        (*this)(std::forward<Tail>(tail)...);
+    }
+
+    template <class Optimizer>
+    HOOLIB_CONSTEXPR void operator()(Optimizer&& op)
+    {
+        op();
     }
 };
 
@@ -388,6 +421,7 @@ HOOLIB_CONSTEXPR auto train()
     constexpr size_t train_sample_num = 2, train_sample_size = 764;
     std::array<TrainResult, Epoch> ret;
     MLP3<batch_size, train_sample_size, 100, 10> nn;
+    auto optimizers = nn.generate_optimizers(AdamGenerator(0.1));
 
     for (size_t i = 0; i < Epoch; i++) {
         float train_loss = 0;
@@ -403,7 +437,7 @@ HOOLIB_CONSTEXPR auto train()
             train_loss += loss;
 
             nn.backward();
-            nn.update(SGD(0.1));
+            std::apply(CallOptimizer(), optimizers);
         }
         train_loss /= (train_sample_num / batch_size);
 
@@ -433,7 +467,7 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    constexpr auto res = train<100>();
+    constexpr auto res = train<1>();
     for (auto&& r : res)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
