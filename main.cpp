@@ -127,12 +127,32 @@ struct Matrix {
         }
     }
 
+    // broadcast
+    HOOLIB_CONSTEXPR Matrix<N, M> operator+(float rhs) const
+    {
+        Matrix<N, M> ret;
+        for (size_t i = 0; i < N; i++)
+            for (size_t j = 0; j < M; j++) ret(i, j) = (*this)(i, j) + rhs;
+        return ret;
+    }
+
+    template <class R>
+    HOOLIB_CONSTEXPR Matrix<N, M> operator-(const R& rhs) const
+    {
+        return *this + rhs * -1;
+    }
+
     HOOLIB_CONSTEXPR Matrix<N, M> operator*(float scalar) const
     {
         Matrix<N, M> ret;
         for (size_t i = 0; i < N; i++)
             for (size_t j = 0; j < M; j++) ret(i, j) = (*this)(i, j) * scalar;
         return ret;
+    }
+
+    HOOLIB_CONSTEXPR Matrix<N, M> operator/(float scalar) const
+    {
+        return *this * (1. / scalar);
     }
 
     template <size_t L>
@@ -145,7 +165,35 @@ struct Matrix {
                     ret(i, j) += (*this)(i, k) * rhs(k, j);
         return ret;
     }
+
+    HOOLIB_CONSTEXPR Matrix<N, M> operator*(const Matrix<N, M>& rhs) const
+    {
+        Matrix<N, M> ret;
+        for (size_t i = 0; i < N; i++)
+            for (size_t j = 0; j < M; j++)
+                ret(i, j) = (*this)(i, j) * rhs(i, j);
+        return ret;
+    }
+
+    HOOLIB_CONSTEXPR Matrix<N, M> operator/(const Matrix<N, M>& rhs) const
+    {
+        Matrix<N, M> ret;
+        for (size_t i = 0; i < N; i++)
+            for (size_t j = 0; j < M; j++)
+                ret(i, j) = (*this)(i, j) / rhs(i, j);
+        return ret;
+    }
 };
+
+template <size_t N, size_t M>
+HOOLIB_CONSTEXPR Matrix<N, M> sqrt(const Matrix<N, M>& src)
+{
+    Matrix<N, M> ret;
+    for (size_t i = 0; i < N; i++)
+        for (size_t j = 0; j < M; j++)
+            ret(i, j) = sprout::math::sqrt(src(i, j));
+    return ret;
+}
 
 template <size_t lN, size_t lM, size_t rN, size_t rM>
 HOOLIB_CONSTEXPR bool operator==(const Matrix<lN, lM>& lhs,
@@ -352,39 +400,71 @@ HOOLIB_CONSTEXPR auto predict(NN nn, const Matrix<N, InSize>& src)
 
 template <class Mat>
 struct Adam {
-    float lr;
-    Mat &W, dW;
+    float alpha, beta1, beta2, beta1_t, beta2_t, eps;
+    Mat &W, &dW;
+    Mat m, v;
 
-    // TODO
-    HOOLIB_CONSTEXPR Adam(float alr, Mat& aW, Mat& adW)
-        : lr(alr), W(aW), dW(adW)
+    HOOLIB_CONSTEXPR Adam(Mat& aW, Mat& adW, float a, float b1, float b2,
+                          float e)
+        : alpha(a),
+          beta1(b1),
+          beta2(b2),
+          beta1_t(b1),
+          beta2_t(b2),
+          eps(e),
+          W(aW),
+          dW(adW)
+    {
+    }
+
+    HOOLIB_CONSTEXPR void operator()()
+    {
+        m = m * beta1 + dW * (1 - beta1);
+        v = v * beta2 + dW * dW * (1 - beta2);
+        auto m_hat = m / (1 - beta1_t);
+        auto v_hat = v / (1 - beta2_t);
+        W = W - (m_hat * alpha) / (sqrt(v_hat) + eps);
+        beta1_t *= beta1;
+        beta2_t *= beta2;
+    }
+};
+
+struct AdamGenerator {
+    float alpha, beta1, beta2, eps;
+    HOOLIB_CONSTEXPR AdamGenerator(float a = 0.001, float b1 = 0.9,
+                                   float b2 = 0.999, float e = 10e-8)
+        : alpha(a), beta1(b1), beta2(b2), eps(e)
+    {
+    }
+
+    template <class Mat>
+    HOOLIB_CONSTEXPR Adam<Mat> operator()(Mat& W, Mat& dW)
+    {
+        return Adam<Mat>(W, dW, alpha, beta1, beta2, eps);
+    }
+};
+
+template <class Mat>
+struct SGD {
+    float lr;
+    Mat &W, &dW;
+
+    HOOLIB_CONSTEXPR SGD(Mat& aW, Mat& adW, float alr) : lr(alr), W(aW), dW(adW)
     {
     }
 
     HOOLIB_CONSTEXPR void operator()() { W = W + dW * -lr; }
 };
 
-struct AdamGenerator {
+struct SGDGenerator {
     float lr;
-    HOOLIB_CONSTEXPR AdamGenerator(float alr) : lr(alr) {}
+
+    HOOLIB_CONSTEXPR SGDGenerator(float alr = 0.1) : lr(alr) {}
 
     template <class Mat>
-    HOOLIB_CONSTEXPR Adam<Mat> operator()(Mat& W, Mat& dW)
+    HOOLIB_CONSTEXPR SGD<Mat> operator()(Mat& W, Mat& dW)
     {
-        return Adam(lr, W, dW);
-    }
-};
-
-struct SGD {
-    float lr;
-
-    HOOLIB_CONSTEXPR SGD(float alr) : lr(alr) {}
-
-    template <size_t BatchSize, size_t Size>
-    HOOLIB_CONSTEXPR Matrix<BatchSize, Size> operator()(
-        const Matrix<BatchSize, Size>& W, const Matrix<BatchSize, Size>& dW)
-    {
-        return W + dW * -lr;
+        return SGD<Mat>(W, dW, lr);
     }
 };
 
@@ -421,7 +501,7 @@ HOOLIB_CONSTEXPR auto train()
     constexpr size_t train_sample_num = 2, train_sample_size = 764;
     std::array<TrainResult, Epoch> ret;
     MLP3<batch_size, train_sample_size, 100, 10> nn;
-    auto optimizers = nn.generate_optimizers(AdamGenerator(0.1));
+    auto optimizers = nn.generate_optimizers(AdamGenerator());
 
     for (size_t i = 0; i < Epoch; i++) {
         float train_loss = 0;
@@ -467,7 +547,7 @@ HOOLIB_CONSTEXPR auto train()
 
 int main()
 {
-    constexpr auto res = train<1>();
+    constexpr auto res = train<100>();
     for (auto&& r : res)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
