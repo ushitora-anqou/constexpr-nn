@@ -617,11 +617,29 @@ HOOLIB_CONSTEXPR auto train()
     return std::make_pair(nn, ret);
 }
 
-int main()
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+int main(int argc, char** argv)
 {
     constexpr auto res = train<3>();
     for (auto&& r : res.second)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
                   << "test accuracy: " << r.test_accuracy << std::endl;
+
+    if (argc != 2) return 0;
+
+    auto nn = res.first;
+    std::cout << predict(nn, [&] {
+        int w, h, n;
+        unsigned char* data = stbi_load(argv[1], &w, &h, &n, 0);
+        assert(w == 22 && h == 22);
+        Matrix<1, 22 * 22> ret;
+        for (size_t j = 0; j < h; j++)
+            for (size_t i = 0; i < w; i++)
+                ret(i, j) = data[(j * w + i) * n] / 255.;
+        stbi_image_free(data);
+        return ret;
+    }())[0] << std::endl;
 }
