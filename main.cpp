@@ -569,12 +569,14 @@ HOOLIB_CONSTEXPR auto train()
 {
     // dataset
     constexpr size_t batch_size = 1;
-    constexpr size_t train_sample_num = 2, train_sample_size = 764;
+    constexpr size_t train_sample_num = MNIST_TRAIN_SAMPLE_NUM,
+                     train_sample_size = MNIST_TRAIN_SAMPLE_SIZE;
     auto train_dataset = Dataset(
         matrix_from_array<train_sample_num, train_sample_size>(
             MNIST_TRAIN_SAMPLES_X),
         onehot_from_array<train_sample_num, 10>(MNIST_TRAIN_SAMPLES_T), true);
-    constexpr size_t test_sample_num = 2, test_sample_size = 764;
+    constexpr size_t test_sample_num = MNIST_TEST_SAMPLE_NUM,
+                     test_sample_size = MNIST_TEST_SAMPLE_SIZE;
     auto test_dataset = Dataset(
         matrix_from_array<test_sample_num, test_sample_size>(
             MNIST_TEST_SAMPLES_X),
@@ -612,13 +614,13 @@ HOOLIB_CONSTEXPR auto train()
             static_cast<float>(correct_count) / test_sample_num;
     }
 
-    return ret;
+    return std::make_pair(nn, ret);
 }
 
 int main()
 {
-    constexpr auto res = train<1>();
-    for (auto&& r : res)
+    constexpr auto res = train<3>();
+    for (auto&& r : res.second)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
                   << "test accuracy: " << r.test_accuracy << std::endl;
