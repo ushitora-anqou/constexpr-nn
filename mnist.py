@@ -36,8 +36,8 @@ def get_small_mnist(ndim):
     return chainer.datasets.TupleDataset(*train), chainer.datasets.TupleDataset(*test)
 
 
-train_sample_num = 2
-test_sample_num = 2
+train_sample_num = 15000
+test_sample_num = 15000
 
 
 #mnist = chainer.datasets.get_mnist()

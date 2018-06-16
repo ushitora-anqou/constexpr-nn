@@ -23,6 +23,8 @@
 #define HOOOLIB_IF_CONSTEXPR if
 #endif
 
+//#define CNSTNN_GET_TEST_ACC_AT_COMPILE_TIME
+
 //////////////////////
 /// Random
 //////////////////////
@@ -509,7 +511,7 @@ struct TrainResult {
     float train_loss;
     float test_accuracy;
 
-    HOOLIB_CONSTEXPR TrainResult() : train_loss(0), test_accuracy(0) {}
+    HOOLIB_CONSTEXPR TrainResult() : train_loss(0), test_accuracy(-1) {}
 };
 
 template <class MatX, class MatT>
@@ -564,26 +566,44 @@ HOOLIB_CONSTEXPR Matrix<N, L> onehot_from_array(const size_t* const src)
     return ret;
 }
 
-template <size_t Epoch>
+template <size_t BatchSize, class NN, class Ds>
+HOOLIB_CONSTEXPR float test_accuracy(const NN& nn, Ds& dataset)
+{
+    constexpr size_t test_sample_num = MNIST_TEST_SAMPLE_NUM;
+
+    size_t correct_count = 0;
+    for (size_t bi = 0; bi < test_sample_num / BatchSize; bi++) {
+        auto [batch, ans] = dataset.template next<BatchSize>();
+        auto y = predict(nn, batch);
+
+        for (size_t i = 0; i < BatchSize; i++)
+            if (ans[y[i]] > 0.5) correct_count++;
+    }
+
+    return static_cast<float>(correct_count) / test_sample_num;
+}
+
+template <size_t Epoch, size_t TrainBatchSize, size_t TestBatchSize>
 HOOLIB_CONSTEXPR auto train()
 {
     // dataset
-    constexpr size_t batch_size = 1;
     constexpr size_t train_sample_num = MNIST_TRAIN_SAMPLE_NUM,
                      train_sample_size = MNIST_TRAIN_SAMPLE_SIZE;
     auto train_dataset = Dataset(
         matrix_from_array<train_sample_num, train_sample_size>(
             MNIST_TRAIN_SAMPLES_X),
         onehot_from_array<train_sample_num, 10>(MNIST_TRAIN_SAMPLES_T), true);
+#ifdef CNSTNN_GET_TEST_ACC_AT_COMPILE_TIME
     constexpr size_t test_sample_num = MNIST_TEST_SAMPLE_NUM,
                      test_sample_size = MNIST_TEST_SAMPLE_SIZE;
     auto test_dataset = Dataset(
         matrix_from_array<test_sample_num, test_sample_size>(
             MNIST_TEST_SAMPLES_X),
         onehot_from_array<test_sample_num, 10>(MNIST_TEST_SAMPLES_T), false);
+#endif
 
     // nn
-    MLP3<batch_size, train_sample_size, 100, 10> nn;
+    MLP3<TrainBatchSize, train_sample_size, 100, 10> nn;
     auto optimizers = nn.generate_optimizers(AdamGenerator());
 
     // result
@@ -592,26 +612,16 @@ HOOLIB_CONSTEXPR auto train()
     // learning loop
     for (size_t i = 0; i < Epoch; i++) {
         float train_loss = 0;
-        for (size_t bi = 0; bi < train_sample_num / batch_size; bi++) {
-            auto [batch, onehot_t] = train_dataset.next<batch_size>();
+        for (size_t bi = 0; bi < train_sample_num / TrainBatchSize; bi++) {
+            auto [batch, onehot_t] = train_dataset.next<TrainBatchSize>();
             train_loss += nn.forward(batch, onehot_t);
             nn.backward();
             std::apply(CallOptimizer(), optimizers);
         }
-        train_loss /= (train_sample_num / batch_size);
-
-        size_t correct_count = 0;
-        for (size_t bi = 0; bi < test_sample_num / batch_size; bi++) {
-            auto [batch, ans] = test_dataset.next<batch_size>();
-            auto y = predict(nn, batch);
-
-            for (size_t i = 0; i < batch_size; i++)
-                if (ans[y[i]] > 0.5) correct_count++;
-        }
-
-        ret[i].train_loss = train_loss;
-        ret[i].test_accuracy =
-            static_cast<float>(correct_count) / test_sample_num;
+        ret[i].train_loss = train_loss / (train_sample_num / TrainBatchSize);
+#ifdef CNSTNN_GET_TEST_ACC_AT_COMPILE_TIME
+        ret[i].test_accuracy = test_accuracy<TestBatchSize>(nn, test_dataset);
+#endif
     }
 
     return std::make_pair(nn, ret);
@@ -622,15 +632,37 @@ HOOLIB_CONSTEXPR auto train()
 
 int main(int argc, char** argv)
 {
-    constexpr auto res = train<3>();
+    constexpr size_t epoch = 1, train_batch_size = 100, test_batch_size = 100;
+
+    // train
+    constexpr auto res = train<epoch, train_batch_size, test_batch_size>();
     for (auto&& r : res.second)
         std::cout << std::setprecision(10) << "train loss: " << r.train_loss
                   << std::endl
-                  << "test accuracy: " << r.test_accuracy << std::endl;
+#ifdef CNSTNN_GET_TEST_ACC_AT_COMPILE_TIME
+                  << "test accuracy (compile time): " << r.test_accuracy
+                  << std::endl
+#endif
+            ;
 
+    // get result nn
+    auto nn = res.first;
+
+#ifndef CNSTNN_GET_TEST_ACC_AT_COMPILE_TIME
+    // calc test acc
+    constexpr size_t test_sample_num = MNIST_TEST_SAMPLE_NUM,
+                     test_sample_size = MNIST_TEST_SAMPLE_SIZE;
+    auto test_dataset = Dataset(
+        matrix_from_array<test_sample_num, test_sample_size>(
+            MNIST_TEST_SAMPLES_X),
+        onehot_from_array<test_sample_num, 10>(MNIST_TEST_SAMPLES_T), false);
+    std::cout << std::setprecision(10) << "test accuracy (runtime): "
+              << test_accuracy<test_batch_size>(nn, test_dataset) << std::endl;
+#endif
+
+    // predict input graph
     if (argc != 2) return 0;
 
-    auto nn = res.first;
     std::cout << predict(nn, [&] {
         int w, h, n;
         unsigned char* data = stbi_load(argv[1], &w, &h, &n, 0);
