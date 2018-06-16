@@ -1,0 +1,133 @@
+Index: include/clang/AST/APValue.h
+===================================================================
+--- include/clang/AST/APValue.h	(リビジョン 334348)
++++ include/clang/AST/APValue.h	(作業コピー)
+@@ -61,7 +61,7 @@
+     LValueBase() : CallIndex(0), Version(0) {}
+ 
+     template <class T>
+-    LValueBase(T P, unsigned I = 0, unsigned V = 0)
++    LValueBase(T P, size_t I = 0, unsigned V = 0)
+         : Ptr(P), CallIndex(I), Version(V) {}
+ 
+     template <class T>
+@@ -83,11 +83,11 @@
+       return Ptr;
+     }
+ 
+-    unsigned getCallIndex() const {
++    size_t getCallIndex() const {
+       return CallIndex;
+     }
+ 
+-    void setCallIndex(unsigned Index) {
++    void setCallIndex(size_t Index) {
+       CallIndex = Index;
+     }
+ 
+@@ -102,7 +102,8 @@
+ 
+   private:
+     PtrTy Ptr;
+-    unsigned CallIndex, Version;
++    size_t CallIndex;
++    unsigned Version;
+   };
+ 
+   typedef llvm::PointerIntPair<const Decl *, 1, bool> BaseOrMemberType;
+@@ -305,7 +306,7 @@
+   bool isLValueOnePastTheEnd() const;
+   bool hasLValuePath() const;
+   ArrayRef<LValuePathEntry> getLValuePath() const;
+-  unsigned getLValueCallIndex() const;
++  size_t getLValueCallIndex() const;
+   unsigned getLValueVersion() const;
+   bool isNullPointer() const;
+ 
+Index: lib/AST/APValue.cpp
+===================================================================
+--- lib/AST/APValue.cpp	(リビジョン 334348)
++++ lib/AST/APValue.cpp	(作業コピー)
+@@ -618,7 +618,7 @@
+   return llvm::makeArrayRef(LVal.getPath(), LVal.PathLength);
+ }
+ 
+-unsigned APValue::getLValueCallIndex() const {
++size_t APValue::getLValueCallIndex() const {
+   assert(isLValue() && "Invalid accessor");
+   return ((const LV*)(const char*)Data.buffer)->Base.getCallIndex();
+ }
+Index: lib/AST/ExprConstant.cpp
+===================================================================
+--- lib/AST/ExprConstant.cpp	(リビジョン 334348)
++++ lib/AST/ExprConstant.cpp	(作業コピー)
+@@ -461,7 +461,7 @@
+     SourceLocation CallLoc;
+ 
+     /// Index - The call index of this call.
+-    unsigned Index;
++    size_t Index;
+ 
+     /// The stack of integers for tracking version numbers for temporaries.
+     SmallVector<unsigned, 2> TempVersionStack = {1};
+@@ -627,12 +627,12 @@
+     unsigned CallStackDepth;
+ 
+     /// NextCallIndex - The next call index to assign.
+-    unsigned NextCallIndex;
++    size_t NextCallIndex;
+ 
+     /// StepsLeft - The remaining number of evaluation steps we're permitted
+     /// to perform. This is essentially a limit for the number of statements
+     /// we will evaluate.
+-    unsigned StepsLeft;
++    int StepsLeft;
+ 
+     /// BottomFrame - The frame in which evaluation started. This must be
+     /// initialized after CurrentCall and CallStackDepth.
+@@ -652,7 +652,7 @@
+ 
+     /// EvaluatingObject - Pair of the AST node that an lvalue represents and
+     /// the call index that that lvalue was allocated in.
+-    typedef std::pair<APValue::LValueBase, std::pair<unsigned, unsigned>>
++    typedef std::pair<APValue::LValueBase, std::pair<size_t, unsigned>>
+         EvaluatingObject;
+ 
+     /// EvaluatingConstructors - Set of objects that are currently being
+@@ -672,7 +672,7 @@
+       }
+     };
+ 
+-    bool isEvaluatingConstructor(APValue::LValueBase Decl, unsigned CallIndex,
++    bool isEvaluatingConstructor(APValue::LValueBase Decl, size_t CallIndex,
+                                  unsigned Version) {
+       return EvaluatingConstructors.count(
+           EvaluatingObject(Decl, {CallIndex, Version}));
+@@ -793,7 +793,7 @@
+       return false;
+     }
+ 
+-    CallStackFrame *getCallFrame(unsigned CallIndex) {
++    CallStackFrame *getCallFrame(size_t CallIndex) {
+       assert(CallIndex && "no call index in getCallFrame");
+       // We will eventually hit BottomFrame, which has Index 1, so Frame can't
+       // be null in this loop.
+@@ -808,7 +808,8 @@
+         FFDiag(S->getLocStart(), diag::note_constexpr_step_limit_exceeded);
+         return false;
+       }
+-      --StepsLeft;
++      if (StepsLeft > 0)
++          --StepsLeft;
+       return true;
+     }
+ 
+@@ -1328,7 +1329,7 @@
+     const SubobjectDesignator &getLValueDesignator() const { return Designator;}
+     bool isNullPointer() const { return IsNullPtr;}
+ 
+-    unsigned getLValueCallIndex() const { return Base.getCallIndex(); }
++    size_t getLValueCallIndex() const { return Base.getCallIndex(); }
+     unsigned getLValueVersion() const { return Base.getVersion(); }
+ 
+     void moveInto(APValue &V) const {
